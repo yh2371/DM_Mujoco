@@ -1,34 +1,43 @@
-# @ author: Kangyao Huang
-# @   date: Mar.31.2023
+FROM nvidia/cuda@sha256:0a90df2e70c3359d51a18baf924d3aa65570f02121646daa6749de6d2b46a464
 
-# If you want to use a different version of CUDA, view the available
-# images here: https://hub.docker.com/r/nvidia/cuda
-# Note:
-#   - Jax currently supports CUDA versions up to 11.3.
-#   - Tensorflow required CUDA versions after 11.2.
-ARG cuda_docker_tag="11.2.2-cudnn8-devel-ubuntu20.04"
-FROM nvidia/cuda:${cuda_docker_tag}
+RUN apt-get update -q \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    curl \
+    git \
+    libgl1-mesa-dev \
+    libgl1-mesa-glx \
+    libglew-dev \
+    libosmesa6-dev \
+    software-properties-common \
+    net-tools \
+    vim \
+    virtualenv \
+    wget \
+    xpra \
+    xserver-xorg-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update
-# tzdata is required below. To avoid hanging, install it first.
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install tzdata -y
-RUN apt-get install git wget libgl1-mesa-glx -y
+RUN DEBIAN_FRONTEND=noninteractive add-apt-repository --yes ppa:deadsnakes/ppa && apt-get update
 
-# Install python3.8.
-RUN apt-get install software-properties-common -y
-RUN add-apt-repository ppa:deadsnakes/ppa -y
-RUN apt-get install python3.8 -y
+# Python 3.6
+RUN apt-get install -y libssl-dev \
+    zlib1g-dev \
+    libjpeg-dev
 
-# Make python3.8 the default python.
-RUN rm /usr/bin/python3
-RUN ln -s /usr/bin/python3.8 /usr/bin/python3
-RUN ln -s /usr/bin/python3.8 /usr/bin/python
-RUN apt-get install python3-distutils -y
+RUN wget https://www.python.org/ftp/python/3.6.15/Python-3.6.15.tgz \
+ && tar xvf Python-3.6.15.tgz \
+ && cd Python-3.6.15 \
+ && ./configure --prefix=/usr --enable-optimizations --enable-shared \
+ && make altinstall
 
-# Install pip.
-RUN wget https://bootstrap.pypa.io/get-pip.py
-RUN python get-pip.py
-RUN rm get-pip.py
+RUN if [ -f /usr/bin/python3 ]; then rm /usr/bin/python3; fi && ln -s /usr/bin/python3.6 /usr/bin/python3
+RUN if [ -f /usr/bin/python ]; then rm /usr/bin/python; fi && ln -s /usr/bin/python3.6 /usr/bin/python
+RUN if [ -f /usr/bin/pip3 ]; then rm /usr/bin/pip3; fi && ln -s /usr/bin/pip3.6 /usr/bin/pip3
+RUN if [ -f /usr/bin/pip ]; then rm /usr/bin/pip; fi && ln -s /usr/bin/pip3.6 /usr/bin/pip
+
+RUN curl -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
+    && chmod +x /usr/local/bin/patchelf
 
 # Create Mujoco subdir.
 RUN mkdir /root/.mujoco
@@ -42,34 +51,16 @@ RUN apt-get install \
   libglew-dev \
   patchelf \
   gcc \
-  python3.8-dev \
   unzip -y \
   libxrandr2 \
   libxinerama1 \
   libxcursor1 \
   vim \
-  openssh-server
-
-# SSH config
-RUN echo "root:123123" | chpasswd
-RUN echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
-RUN echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
-RUN echo 'X11Forwarding yes' >> /etc/ssh/sshd_config
-RUN echo 'X11Displayoffset 10' >> /etc/ssh/sshd_config
-RUN echo 'X11UseLocalhost no' >> /etc/ssh/sshd_config
-RUN service ssh restart
-
-# set SSH auto-on
-RUN touch /root/start_ssh.sh
-RUN echo '#!/bin/bash \n\
-  LOGTIME=$(date "+%Y-%m-%d %H:%M:%S") \n\
-  echo "[$LOGTIME] startup run..." >>/root/start_ssh.log \n\
-  service ssh start >>/root/start_ssh.log' >> /root/start_ssh.sh
-RUN chmod +x /root/start_ssh.sh
-RUN echo '# startup run \n\
-  if [ -f /root/start_ssh.sh ]; then \n\
-      /root/start_ssh.sh \n\
-  fi' >> /root/.bashrc
+  openssh-server \
+  openmpi-bin \
+  openmpi-common \
+  openssh-client \
+  libopenmpi-dev
 
 # Download and install mujoco.
 RUN wget https://www.roboti.us/download/mujoco200_linux.zip
@@ -78,9 +69,26 @@ RUN rm mujoco200_linux.zip
 RUN mv mujoco200_linux /root/.mujoco/mujoco200
 RUN wget -P /root/.mujoco/mujoco200/bin/ https://roboti.us/file/mjkey.txt
 
+RUN rm /usr/bin/lsb_release
 # Add LD_LIBRARY_PATH environment variable.
 ENV LD_LIBRARY_PATH "/root/.mujoco/mujoco200/bin:${LD_LIBRARY_PATH}"
 RUN echo 'export LD_LIBRARY_PATH=/root/.mujoco/mujoco200/bin:${LD_LIBRARY_PATH}' >> /etc/bash.bashrc
+RUN echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-10.0/compat:${LD_LIBRARY_PATH}' >> /etc/bash.bashrc
 
 # Finally, install mujoco_py.
 RUN pip install mujoco_py==2.0.2.8
+RUN pip install gym==0.12.5 protobuf==3.7.1 grpcio==1.20.1 imageio==2.5.0 tensorflow-gpu==1.13.1 pyquaternion joblib==0.13.2 opencv-python==4.1.0.25 mpi4py
+
+WORKDIR /
+
+RUN git clone https://github.com/mingfeisun/DeepMimic_mujoco.git
+
+SHELL ["/bin/bash", "-c"]
+
+#RUN ln /DM_HW/DeepMimicCore/third/glew-2.1.0/lib/libGLEW.so.2.1.0 /usr/lib/x86_64-linux-gnu/libGLEW.so.2.1.0
+
+#RUN ln /DM_HW/DeepMimicCore/third/glew-2.1.0/lib/libGLEW.so.2.1 /usr/lib/x86_64-linux-gnu/libGLEW.so.2.1 
+
+RUN pip install "cython<3"
+RUN pip install typing-extensions
+WORKDIR /DeepMimic_mujoco
