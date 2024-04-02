@@ -77,7 +77,7 @@ RUN echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-10.0/compat:${
 
 # Finally, install mujoco_py.
 RUN pip install mujoco_py==2.0.2.8
-RUN pip install gym==0.12.5 protobuf==3.7.1 grpcio==1.20.1 imageio==2.5.0 tensorflow-gpu==1.13.1 pyquaternion joblib==0.13.2 opencv-python==4.1.0.25 mpi4py
+RUN pip install gym==0.12.5 protobuf==3.7.1 grpcio==1.20.1 imageio==2.5.0 tensorflow-gpu==1.13.1 pyquaternion joblib==0.13.2 opencv-python==4.1.0.25 mpi4py torch
 
 WORKDIR /
 

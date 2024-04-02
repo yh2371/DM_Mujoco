@@ -170,11 +170,7 @@ class DPEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def viewer_setup(self):
         pass
-        # self.viewer.cam.trackbodyid = 1
-        # self.viewer.cam.distance = self.model.stat.extent * 1.0
-        # self.viewer.cam.lookat[2] = 2.0
-        # self.viewer.cam.elevation = -20
-
+        
 if __name__ == "__main__":
     env = DPEnv()
     env.reset_model()
