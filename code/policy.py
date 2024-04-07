@@ -1,6 +1,5 @@
 import sys
 import os
-
 # Add the parent directory of 'code' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -10,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from distributions import make_pdtype
 import gym
+from torch.distributions.normal import Normal
+
 
 class MlpPolicy(nn.Module):
     def __init__(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
@@ -22,39 +23,35 @@ class MlpPolicy(nn.Module):
 
         ob_shape = (sequence_length,) + tuple(ob_space.shape)
 
-	### STUDENT CODE START ###
-        self.obfilter = nn.Linear(np.prod(ob_space.shape), hid_size)
-        
+	    ### TODO ###
+        self.actor = nn.ModuleList([nn.Linear(np.prod(ob_space.shape), hid_size)] + [nn.Linear(hid_size, hid_size) for _ in range(num_hid_layers)])  
+        self.critic = nn.Linear(np.prod(ob_space.shape), hid_size)
         self.vpred = nn.Linear(hid_size, 1)
 
-        self.polfc = nn.ModuleList([nn.Linear(hid_size, hid_size) for _ in range(num_hid_layers)])
-        self.polfinal = nn.Linear(hid_size, pdtype.param_shape()[0]//2)
-
+        self.mean_pred = nn.Linear(hid_size, pdtype.param_shape()[0]//2)
         self.logstd = nn.Parameter(torch.zeros(1, pdtype.param_shape()[0]//2))
-        ### STUDENT CODE END ###
 
     def forward(self, ob):
-    	### STUDENT CODE START ###
-        obz = F.relu(self.obfilter(ob))
+    	### TODO ###
+        vpred = self.vpred(F.relu(self.critic(ob))) 
         
-        vpred = self.vpred(obz)
-        
-        for fc in self.polfc:
+        obz = ob
+        for fc in self.actor:
             obz = F.relu(fc(obz))
-
-        mean = self.polfinal(obz)       
-        pdparam = torch.cat([mean, mean * 0.0 + self.logstd.exp()], dim=1)
+        mean = self.mean_pred(obz)     
+        logstd = self.logstd#_pred(obz)  
  
-        return pdparam, vpred
-        ### STUDENT CODE END ###
+        return mean, logstd, vpred
 
     def act(self, ob):
-    	### STUDENT CODE END ###
-        pdparam, vpred = self.forward(ob)        
-        ac = pdparam[:, :self.pdtype.param_shape()[0]//2] + torch.randn_like(pdparam[:, :self.pdtype.param_shape()[0]//2]) * pdparam[:, self.pdtype.param_shape()[0]//2:]
+    	### TODO ###
+        mean, logstd, vpred = self.forward(ob)  
 
-        return ac, vpred
-        ### STUDENT CODE END ###
+        dist = Normal(mean, logstd.exp())
+        ac = dist.sample()
+        #ac = mean + torch.randn_like(mean) * logstd.exp()
+
+        return ac, vpred, mean, logstd
 
     def get_trainable_variables(self):
         return filter(lambda p: p.requires_grad, self.parameters())

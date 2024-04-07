@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from policy import MlpPolicy, build_policy_network
 
 # Behavior cloning
-def behavior_cloning(obs, actions, policy_network, num_epochs=10):
+def behavior_cloning(obs, actions, policy_network, num_epochs=200):
 
     ### STUDENT CODE START###
     # Define your loss function and optimizer
@@ -76,6 +76,11 @@ def main():
 
     # One evaluation loop
     policy_net.eval()
+    total = 0
+
+    MAX_STEPS = 200
+    
+    steps = 0
     while True:
         # Get observation from environment
         obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
@@ -86,18 +91,20 @@ def main():
         # Step the environment with the predicted action
         next_obs, reward, done, _ = env.step(action)
 
-        env.calc_config_reward()
+        total += reward
 
-        # Render the environment
-        #env.render()
-
-        # Optionally save video, comment out to view simulation
+        # Save render
         vid_save.addFrame(env.render(mode='rgb_array'))
 
         # Check if episode is done
         if done:
+            print("Total Reward:", total)
             break
-            
+        
+        steps +=1 
+        if steps >= MAX_STEPS:
+            print("Total Reward:", total)
+            break
         ### STUDENT CODE START ###
         # Add reward plotting
         ### STUDENT CODE END ###
