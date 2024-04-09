@@ -16,7 +16,7 @@ class MlpPolicy(nn.Module):
     def __init__(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
         super(MlpPolicy, self).__init__()
 
-        assert isinstance(ob_space, gym.spaces.Box)
+        # assert isinstance(ob_space, gym.spaces.Box)
 
         # self.pdtype = pdtype = make_pdtype(ac_space)
         # sequence_length = None
@@ -24,12 +24,12 @@ class MlpPolicy(nn.Module):
         # ob_shape = (sequence_length,) + tuple(ob_space.shape)
 
 	    ### TODO ###
-        self.actor = nn.ModuleList([nn.Linear(np.prod(ob_space.shape), hid_size)] + [nn.Linear(hid_size, hid_size) for _ in range(num_hid_layers)])  
-        self.critic = nn.Linear(np.prod(ob_space.shape), hid_size)
+        self.actor = nn.ModuleList([nn.Linear(ob_space, hid_size)] + [nn.Linear(hid_size, hid_size) for _ in range(num_hid_layers)])  
+        self.critic = nn.Linear(ob_space, hid_size)
         self.vpred = nn.Linear(hid_size, 1)
 
-        self.mean_pred = nn.Linear(hid_size, ac_space.shape[0])
-        self.logstd = nn.Parameter(torch.zeros(1, ac_space.shape[0]))
+        self.mean_pred = nn.Linear(hid_size, ac_space)
+        self.logstd = nn.Parameter(torch.zeros(1, ac_space))
 
     def forward(self, ob):
     	### TODO ###

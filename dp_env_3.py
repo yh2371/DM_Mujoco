@@ -140,8 +140,8 @@ class DPEnv():
         return False
 
     def get_joint_configs(self):
-        data = self.sim.data
-        return data.qpos[7:] # to exclude root joint
+        data = self.md.qpos
+        return data[7:] # to exclude root joint
 
     def get_root_configs(self):
         data = self.sim.data
@@ -205,8 +205,8 @@ class DPEnv():
         # step_times = 1
         #print(action)
         mujoco.mj_step1(self.m, self.md)
-
-        mujoco.mj_step2(self.m, self.md, action)
+        self.md.ctrl[:] = action
+        mujoco.mj_step2(self.m, self.md)
         # self.do_simulation(action, step_times)
 
         reward_config,  err_config = self.calc_config_reward()

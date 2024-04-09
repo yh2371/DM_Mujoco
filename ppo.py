@@ -8,6 +8,7 @@ from VideoSaver import VideoSaver
 import numpy as np
 import time
 from torch.distributions.normal import Normal
+import mujoco
 
 class PPO:
     def __init__(self, ob_space, ac_space, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
@@ -96,7 +97,10 @@ class PPO:
             ep_rews = [] # rewards collected per episode
 
             # Reset the environment per episode
-            obs = self.env.reset()
+            mujoco.mj_resetData(self.env.m, self.env.md)
+            # mujoco.mj_step(self.env.m, self.env.md)
+            obs = self.env._get_obs()
+            
             done = False
 
             # Run an episode for a maximum of max_timesteps_per_episode timesteps
@@ -153,8 +157,8 @@ env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humano
 env.reset_model()
     
 # Perform behavior cloning
-ob_space = env.md.observation_space
-ac_space = env.md.action_space
+ob_space = env.md.qpos.shape[0]-7 + env.md.qvel.shape[0]-6
+ac_space = env.md.ctrl.shape[0]
 print(ob_space, ac_space)
 
 # Initialize PPO Agent
