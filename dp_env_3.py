@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mujoco
 from mujoco_file.mocap_v2 import MocapDM
 from mujoco_file.mujoco_interface import MujocoInterface
-from mocap_util import JOINT_WEIGHT
+from mujoco_file.mocap_util import JOINT_WEIGHT
 # from mujoco import load_model_from_xml, MjSim, MjViewer
 
 from gymnasium.envs.mujoco import mujoco_env
@@ -40,8 +40,8 @@ def mass_center(model, sim):
 
 def com_velocity(sim):
     # center of mass velocity
-    mass = np.expand_dims(sim.model.body_mass, 1)
-    vel = sim.data.cvel
+    mass = np.expand_dims(sim.m.body_mass, 1)
+    vel = sim.md.cvel
     return (np.sum(mass * vel, 0) / np.sum(mass))
 
 _exp_weighted_averages = {}
@@ -101,8 +101,6 @@ class DPEnv():
         # self.env = gym.make('Humanoid-v4', xml_file=xml_file_path)
         self.m = mujoco.MjModel.from_xml_path(xml_file_path)
         self.md = mujoco.MjData(self.m)
-        print(self.md.__dir__())
-        print(self.m.__dir__())
         # pdb.set_trace()
         #NEW 
         # mujoco.mj_resetData(model, data), mujoco.mj_forward(model, data), and mujoco.mj_step(model, data).
@@ -111,10 +109,12 @@ class DPEnv():
         # utils.EzPickle.__init__(self)
         # mujoco.mj_deleteModel(self.m) # call this to free memory 
         # mujoco.mj_deleteData(self.md)
+
     def set_state(self, qpos, qvel):
         self.md.qpos[:] = qpos
         self.md.qvel[:] = qvel
         # mujoco.mj_forward(self.m, self.md)
+
     def _quat2euler(self, quat):
         tmp_quat = np.array([quat[1], quat[2], quat[3], quat[0]])
         euler = euler_from_quaternion(tmp_quat, axes='rxyz')
@@ -144,7 +144,7 @@ class DPEnv():
         return data[7:] # to exclude root joint
 
     def get_root_configs(self):
-        data = self.sim.data
+        data = self.md
         return data.qpos[3:7] # to exclude x coord
 
     def load_mocap(self, filepath):
@@ -177,7 +177,7 @@ class DPEnv():
         Compute the reward based on the target heading objective.
         """
         # Compute the speed along the target direction
-        current_velocity = com_velocity(self.sim)[:3] #linear only
+        current_velocity = com_velocity(self)[:3] #linear only
         speed_along_target = np.dot(current_velocity, target_direction)
 
         # Compute the squared difference between desired speed and speed along target
@@ -206,6 +206,7 @@ class DPEnv():
         #print(action)
         mujoco.mj_step1(self.m, self.md)
         self.md.ctrl[:] = action
+        #self.md.qpos[7:] = action
         mujoco.mj_step2(self.m, self.md)
         # self.do_simulation(action, step_times)
 
@@ -275,7 +276,7 @@ class DPEnv():
         return imit_rew
 
     def get_pose_reward(self):
-        qpos = self.sim.data.qpos.copy()[7:]
+        qpos = self.md.qpos.copy()[7:]
         ref_pos = self.mocap.data_config[self.idx_curr].copy()[7:]
 
         dif = qpos - ref_pos
@@ -285,7 +286,7 @@ class DPEnv():
         return pose_rew
 
     def get_vel_reward(self):
-        qvel = self.sim.data.qvel.copy()[6:]
+        qvel = self.md.qvel.copy()[6:]
         ref_vel = self.mocap.data_vel[self.idx_curr].copy()[6:]
 
         difs = qvel - ref_vel
@@ -304,18 +305,18 @@ class DPEnv():
         return com_rew
 
     def is_done(self):
-        mass = np.expand_dims(self.model.body_mass, 1)
-        xpos = self.sim.data.xipos
+        mass = np.expand_dims(self.m.body_mass, 1)
+        xpos = self.md.xipos
         z_com = (np.sum(mass * xpos, 0) / np.sum(mass))[2]
         done = bool((z_com < 0.7) or (z_com > 1.2))
         return done
 
     def goto(self, pos):
-        self.sim.data.qpos[:] = pos[:]
+        self.md.qpos[:] = pos[:]
         self.sim.forward()
 
     def get_time(self):
-        return self.sim.data.time
+        return self.md.time
 
     def reset_model(self):
         self.reference_state_init()

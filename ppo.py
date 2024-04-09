@@ -1,3 +1,8 @@
+import sys
+import os
+# Add the parent directory of 'code' to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -9,10 +14,11 @@ import numpy as np
 import time
 from torch.distributions.normal import Normal
 import mujoco
+import mediapy as media
 
 class PPO:
-    def __init__(self, ob_space, ac_space, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
-        self.policy = MlpPolicy(ob_space, ac_space, hid_size, num_hid_layers)
+    def __init__(self, ob_dim=56, ac_dim=28, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
+        self.policy = MlpPolicy(ob_dim, ac_dim, hid_size, num_hid_layers)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.penalty_coef = penalty_coef
@@ -97,10 +103,7 @@ class PPO:
             ep_rews = [] # rewards collected per episode
 
             # Reset the environment per episode
-            mujoco.mj_resetData(self.env.m, self.env.md)
-            # mujoco.mj_step(self.env.m, self.env.md)
-            obs = self.env._get_obs()
-            
+            obs = self.env.reset_model()
             done = False
 
             # Run an episode for a maximum of max_timesteps_per_episode timesteps
@@ -155,14 +158,13 @@ class PPO:
 # Initialize environment
 env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
 env.reset_model()
+renderer = mujoco.Renderer(env.m)
+data = mujoco.MjData(env.m)
     
 # Perform behavior cloning
-ob_space = env.md.qpos.shape[0]-7 + env.md.qvel.shape[0]-6
-ac_space = env.md.ctrl.shape[0]
-print(ob_space, ac_space)
 
 # Initialize PPO Agent
-ppo_agent = PPO(ob_space, ac_space, env=env)
+ppo_agent = PPO(env=env)
 
 # Load BC weights
 ppo_agent.policy.load_state_dict(torch.load("bc_weights.pth"),)
@@ -185,14 +187,17 @@ for _ in range(MAX_ITER):
     print("#"*20)
 
     # Initialize video saver
-    width = 500
-    height = 500
-    vid_save = VideoSaver(width=width, height=height, fps = 30)
+    width = 320
+    height = 240
+    # vid_save = VideoSaver(width=width, height=height, fps = 30)
+    import cv2
+    video = cv2.VideoWriter("test.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (width,height))
     
     # One evaluation loop for visualization
     ppo_agent.policy.eval()
     env.reset_model()
     steps = 0
+    frames = []
     while True:
         # Get observation from environment
         obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
@@ -206,9 +211,17 @@ for _ in range(MAX_ITER):
 
         # Render the environment
         #env.render()
+        mujoco.mj_forward(env.m, data)
+        renderer.update_scene(data)
+        frame = renderer.render()
+        #print(frame.shape)
+        # frames.append(frame)
+
+        #media.show_image(renderer.render())
 
         # Optionally save video, comment out to view simulation
-        vid_save.addFrame(env.render(mode='rgb_array'))
+        # vid_save.addFrame(seg)
+        video.write(frame)
         steps +=1 
         if steps >= MAX_STEPS:
             print("Done")
@@ -222,6 +235,8 @@ for _ in range(MAX_ITER):
         ### STUDENT CODE START ###
         # Add reward plotting
         ### STUDENT CODE END ###
-
+    cv2.destroyAllWindows()
+    video.release()
+    break
     # Close video saver
-    vid_save.close()
+    # vid_save.close()
