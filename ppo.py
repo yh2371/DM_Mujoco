@@ -14,7 +14,8 @@ import numpy as np
 import time
 from torch.distributions.normal import Normal
 import mujoco
-import mediapy as media
+from mujoco import viewer
+# import mediapy as media
 
 class PPO:
     def __init__(self, ob_dim=56, ac_dim=28, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
@@ -190,42 +191,46 @@ for _ in range(MAX_ITER):
     width = 320
     height = 240
     # vid_save = VideoSaver(width=width, height=height, fps = 30)
-    import cv2
-    video = cv2.VideoWriter("test.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (width,height))
+    # import cv2
+    # video = cv2.VideoWriter("test.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (width,height))
     
     # One evaluation loop for visualization
     ppo_agent.policy.eval()
     env.reset_model()
     steps = 0
     frames = []
-    while True:
-        # Get observation from environment
-        obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
+    with viewer.launch_passive(env.m, env.md) as v:
+        while True:
+            # Get observation from environment
+            obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
 
-        # Use policy network to predict action
-        action = ppo_agent.policy.act(obs)[0].detach().numpy()
+            # Use policy network to predict action
+            action = ppo_agent.policy.act(obs)[0].detach().numpy()
 
-        # Step the environment with the predicted action
-        time.sleep(.002)
-        next_obs, reward, done, _ = env.step(action)
+            # Step the environment with the predicted action
+            
+            next_obs, reward, done, _ = env.step(action)
+            mujoco.mj_step(env.m, env.md)
 
-        # Render the environment
-        #env.render()
-        mujoco.mj_forward(env.m, data)
-        renderer.update_scene(data)
-        frame = renderer.render()
-        #print(frame.shape)
-        # frames.append(frame)
+            v.sync()
+            time.sleep(0.1)
+            # Render the environment
+            #env.render()
+            # mujoco.mj_forward(env.m, data)
+            # renderer.update_scene(data)
+            # frame = renderer.render()
+            #print(frame.shape)
+            # frames.append(frame)
 
-        #media.show_image(renderer.render())
+            #media.show_image(renderer.render())
 
-        # Optionally save video, comment out to view simulation
-        # vid_save.addFrame(seg)
-        video.write(frame)
-        steps +=1 
-        if steps >= MAX_STEPS:
-            print("Done")
-            break
+            # Optionally save video, comment out to view simulation
+            # vid_save.addFrame(seg)
+            # video.write(frame)
+            steps +=1 
+            if steps >= MAX_STEPS:
+                print("Done")
+                break
 
         # Check if episode is done
         if done:
@@ -235,8 +240,8 @@ for _ in range(MAX_ITER):
         ### STUDENT CODE START ###
         # Add reward plotting
         ### STUDENT CODE END ###
-    cv2.destroyAllWindows()
-    video.release()
+    # cv2.destroyAllWindows()
+    # video.release()
     break
     # Close video saver
     # vid_save.close()

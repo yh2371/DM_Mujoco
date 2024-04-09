@@ -35,13 +35,13 @@ DOF_DEF = {"root": 3, "chest": 3, "neck": 3, "right_shoulder": 3,
 
 def mass_center(model, sim):
     mass = np.expand_dims(model.body_mass, 1)
-    xpos = sim.data.xipos
+    xpos = self.md.xipos
     return (np.sum(mass * xpos, 0) / np.sum(mass))[0]
 
-def com_velocity(sim):
+def com_velocity(md, m):
     # center of mass velocity
-    mass = np.expand_dims(sim.m.body_mass, 1)
-    vel = sim.md.cvel
+    mass = np.expand_dims(m.body_mass, 1)
+    vel = md.cvel
     return (np.sum(mass * vel, 0) / np.sum(mass))
 
 _exp_weighted_averages = {}
@@ -144,8 +144,8 @@ class DPEnv():
         return data[7:] # to exclude root joint
 
     def get_root_configs(self):
-        data = self.md
-        return data.qpos[3:7] # to exclude x coord
+        # data = self.sim.data
+        return self.md.qpos[3:7] # to exclude x coord
 
     def load_mocap(self, filepath):
         self.mocap.load_mocap(filepath)
@@ -177,7 +177,7 @@ class DPEnv():
         Compute the reward based on the target heading objective.
         """
         # Compute the speed along the target direction
-        current_velocity = com_velocity(self)[:3] #linear only
+        current_velocity = com_velocity(self.md, self.m)[:3] #linear only
         speed_along_target = np.dot(current_velocity, target_direction)
 
         # Compute the squared difference between desired speed and speed along target
@@ -305,9 +305,9 @@ class DPEnv():
         return com_rew
 
     def is_done(self):
-        mass = np.expand_dims(self.m.body_mass, 1)
-        xpos = self.md.xipos
-        z_com = (np.sum(mass * xpos, 0) / np.sum(mass))[2]
+        mass = self.m.body_mass
+        xpos = self.md.xipos[:,2]
+        z_com = (np.sum(mass * xpos) / np.sum(mass))
         done = bool((z_com < 0.7) or (z_com > 1.2))
         return done
 
