@@ -14,22 +14,22 @@ from policy import MlpPolicy
 from torch.distributions.normal import Normal
 
 # import mediapy as media
-MAX_ITER = 200
+MAX_ITER = 1000
 MAX_STEPS = 200
-N_UPDATES = 10
+# N_UPDATES = 10
 
 class PPO:
-    def __init__(self, ob_dim=56, ac_dim=28, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
+    def __init__(self, ob_dim=56, ac_dim=28, hid_size=100, num_hid_layers=2, lr=1e-6, gamma=0.99, penalty_coef=0.1, env=None):
         self.policy = MlpPolicy(ob_dim, ac_dim, hid_size, num_hid_layers)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.penalty_coef = penalty_coef
         self.kl_target = 0.01
         self.env = env
-        self.timesteps_per_batch = 600
-        self.max_timesteps_per_episode = 200
+        self.timesteps_per_batch = 2000
+        self.max_timesteps_per_episode = MAX_STEPS
         self.verbose = True
-        self.clip_ratio = 0.2
+        self.clip_ratio = 0.001
         ### Feel free to add additional terms ###
 
     def calculate_advantages(self, rtgs, vpred):
@@ -170,20 +170,23 @@ ppo_agent = PPO(env=env)
 
 # Load BC weights
 ppo_agent.policy.load_state_dict(torch.load("bc_weights.pth"),)
-# viz_policy(env, ppo_agent)
-
-for _ in range(MAX_ITER):
+# viz_policy(env, ppo_agent.policy)
+num_iter = 0
+while True:
 
     # Rollouts
     batch_obs, batch_acts, batch_log_probs, batch_rtgs, batch_lens, batch_vpred = ppo_agent.rollout()                     # ALG STEP 3
-    print(f"ITER {_}: Average Estimated Return: {batch_vpred.mean()}, Average Reward per Episode: {batch_rtgs.mean()}")
+    print(f"Average Estimated Return: {batch_vpred.mean()}, Average Reward per Episode: {batch_rtgs.mean()}")
 
     action, V, mean, logstd = ppo_agent.policy.act(batch_obs)
     advantages = ppo_agent.calculate_advantages(batch_rtgs, V)
     print("#"*20)
-    for _ in range(20):                                             
+    for _ in range(1):                                             
         ppo_agent.update(batch_obs, batch_log_probs, advantages, batch_rtgs)
+        num_iter += 1
     print("#"*20)
+    if num_iter >= MAX_ITER:
+        break
 
     # Initialize video saver
     # vid_save = VideoSaver(width=width, height=height, fps = 30)
@@ -194,7 +197,7 @@ for _ in range(MAX_ITER):
 ppo_agent.policy.eval()
 env.reset_model()
 torch.save(ppo_agent.policy.state_dict(), 'ppo_weights.pth')
-viz_policy(env, ppo_agent)
+viz_policy(env, ppo_agent.policy)
     # steps = 0
     # frames = []
  

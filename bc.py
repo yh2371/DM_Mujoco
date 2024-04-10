@@ -60,14 +60,13 @@ def main():
     actions = expert_data['acs']
 
     # Initialize environment
-    env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
-    env.reset_model()
     
     # Perform behavior cloning
     ob_dim=56
     ac_dim=28
     policy_net = build_policy_network(ob_dim, ac_dim)
-    policy_net = behavior_cloning(obs, actions, policy_net)  
+    # policy_net = behavior_cloning(obs, actions, policy_net)  
+    policy_net.load_state_dict(torch.load('bc_weights.pth'))
 
     # Initialize video saver
     # width = 500
@@ -75,6 +74,8 @@ def main():
     # vid_save = VideoSaver(width=width, height=height, fps = 30)
 
     # One evaluation loop
+    env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
+    env.reset_model()
     policy_net.eval()
     viz_policy(env, policy_net)
 

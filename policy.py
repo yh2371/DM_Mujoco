@@ -45,9 +45,9 @@ class MlpPolicy(nn.Module):
     	### TODO ###
         mean, logstd, vpred = self.forward(ob)  
 
-        dist = Normal(mean, logstd.exp())
-        ac = dist.sample()
-        #ac = mean + torch.randn_like(mean) * logstd.exp()
+        # dist = Normal(mean, logstd.exp())
+        # ac = dist.sample()
+        ac = mean + torch.randn_like(mean) * logstd.exp()
 
         return ac, vpred, mean, logstd
 

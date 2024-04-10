@@ -191,7 +191,7 @@ class DPEnv():
 
         err_configs = self.calc_config_errs(curr_config, target_config)
         # reward_config = math.exp(-self.scale_err * self.scale_pose * err_configs)
-        reward_config = math.exp(-err_configs)
+        reward_config = err_configs#math.exp(-err_configs)
 
         return reward_config, err_configs
 
@@ -199,10 +199,10 @@ class DPEnv():
         # self.step_len = 1
         # step_times = 1
         #print(action)
-        mujoco.mj_step1(self.m, self.md)
         self.md.ctrl[:] = action
+        mujoco.mj_step(self.m, self.md)
         #self.md.qpos[7:] = action
-        mujoco.mj_step2(self.m, self.md)
+        # mujoco.mj_step2(self.m, self.md)
         # self.do_simulation(action, step_times)
 
         reward_config,  err_config = self.calc_config_reward()
@@ -215,8 +215,8 @@ class DPEnv():
         self.idx_curr = self.idx_curr % self.mocap_data_len
 
         observation = self._get_obs()
-        done = bool(self.is_done() or err_config >= 10.0)
-        reward = self.get_reward(done)
+        done = bool(self.is_done() or err_config >= 5.0)
+        reward = reward_config#self.get_reward(done)
         if not done:
             self.ep_rews.append(reward) #track rewards
             self.ep_dur += 1
