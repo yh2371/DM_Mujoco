@@ -6,16 +6,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from hw_utils import viz_policy
 # import gymasium
 from dp_env_3 import DPEnv
 from policy import MlpPolicy
-from VideoSaver import VideoSaver
-import numpy as np
-import time
+
 from torch.distributions.normal import Normal
-import mujoco
-from mujoco import viewer
+
 # import mediapy as media
+MAX_ITER = 200
+MAX_STEPS = 200
+N_UPDATES = 10
 
 class PPO:
     def __init__(self, ob_dim=56, ac_dim=28, hid_size=100, num_hid_layers=2, lr=1e-5, gamma=0.99, penalty_coef=0.1, env=None):
@@ -155,12 +156,12 @@ class PPO:
 
         return batch_rtgs
 
-            
+
 # Initialize environment
 env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
 env.reset_model()
-renderer = mujoco.Renderer(env.m)
-data = mujoco.MjData(env.m)
+# renderer = mujoco.Renderer(env.m)
+# data = mujoco.MjData(env.m)
     
 # Perform behavior cloning
 
@@ -169,10 +170,7 @@ ppo_agent = PPO(env=env)
 
 # Load BC weights
 ppo_agent.policy.load_state_dict(torch.load("bc_weights.pth"),)
-
-MAX_ITER = 200
-MAX_STEPS = 200
-N_UPDATES = 10
+# viz_policy(env, ppo_agent)
 
 for _ in range(MAX_ITER):
 
@@ -188,60 +186,24 @@ for _ in range(MAX_ITER):
     print("#"*20)
 
     # Initialize video saver
-    width = 320
-    height = 240
     # vid_save = VideoSaver(width=width, height=height, fps = 30)
     # import cv2
     # video = cv2.VideoWriter("test.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (width,height))
     
     # One evaluation loop for visualization
-    ppo_agent.policy.eval()
-    env.reset_model()
-    steps = 0
-    frames = []
-    with viewer.launch_passive(env.m, env.md) as v:
-        while True:
-            # Get observation from environment
-            obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
-
-            # Use policy network to predict action
-            action = ppo_agent.policy.act(obs)[0].detach().numpy()
-
-            # Step the environment with the predicted action
-            
-            next_obs, reward, done, _ = env.step(action)
-            mujoco.mj_step(env.m, env.md)
-
-            v.sync()
-            time.sleep(0.1)
-            # Render the environment
-            #env.render()
-            # mujoco.mj_forward(env.m, data)
-            # renderer.update_scene(data)
-            # frame = renderer.render()
-            #print(frame.shape)
-            # frames.append(frame)
-
-            #media.show_image(renderer.render())
-
-            # Optionally save video, comment out to view simulation
-            # vid_save.addFrame(seg)
-            # video.write(frame)
-            steps +=1 
-            if steps >= MAX_STEPS:
-                print("Done")
-                break
-
-        # Check if episode is done
-        if done:
-            print("Done")
-            break
-            
+ppo_agent.policy.eval()
+env.reset_model()
+torch.save(ppo_agent.policy.state_dict(), 'ppo_weights.pth')
+viz_policy(env, ppo_agent)
+    # steps = 0
+    # frames = []
+ 
+        
         ### STUDENT CODE START ###
         # Add reward plotting
         ### STUDENT CODE END ###
     # cv2.destroyAllWindows()
     # video.release()
-    break
+    # break
     # Close video saver
     # vid_save.close()

@@ -33,11 +33,6 @@ DOF_DEF = {"root": 3, "chest": 3, "neck": 3, "right_shoulder": 3,
            "left_wrist": 0, "right_hip": 3, "right_knee": 1, "right_ankle": 3, 
            "left_hip": 3, "left_knee": 1, "left_ankle": 3}
 
-def mass_center(model, sim):
-    mass = np.expand_dims(model.body_mass, 1)
-    xpos = self.md.xipos
-    return (np.sum(mass * xpos, 0) / np.sum(mass))[0]
-
 def com_velocity(md, m):
     # center of mass velocity
     mass = np.expand_dims(m.body_mass, 1)
@@ -214,7 +209,7 @@ class DPEnv():
         # reward_root = 10 * self.calc_root_reward()
         # reward = reward_config + reward_root     
 
-        info = dict()
+        # info = dict()
 
         self.idx_curr += 1
         self.idx_curr = self.idx_curr % self.mocap_data_len
@@ -226,7 +221,7 @@ class DPEnv():
             self.ep_rews.append(reward) #track rewards
             self.ep_dur += 1
 
-        return observation, reward, done, info
+        return observation, reward, done, []
     
     def _get_ET_reward(self):
         """ Punish falling hard and reward reaching episode's end a lot. """
@@ -271,7 +266,7 @@ class DPEnv():
         # target heading reward
         direction = np.array([-1,1,0])
         direction = direction/np.linalg.norm(direction)
-        imit_rew = w_pos * pos_rew + w_vel * vel_rew + w_com * com_rew + self.goal_reward(direction,2)
+        imit_rew = w_pos * pos_rew + w_vel * vel_rew + w_com * com_rew + 0.1*self.goal_reward(direction,2)
 
         return imit_rew
 
@@ -308,7 +303,8 @@ class DPEnv():
         mass = self.m.body_mass
         xpos = self.md.xipos[:,2]
         z_com = (np.sum(mass * xpos) / np.sum(mass))
-        done = bool((z_com < 0.7) or (z_com > 1.2))
+        # print(z_com)
+        done = bool((z_com < 0.8) or (z_com > 1.2))
         return done
 
     def goto(self, pos):

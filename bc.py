@@ -6,9 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import cv2
 import numpy as np
-from VideoSaver import VideoSaver
-from dp_env import DPEnv
-import gym
+# from VideoSaver import VideoSaver
+from dp_env_3 import DPEnv
+from hw_utils import viz_policy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -60,57 +60,23 @@ def main():
     actions = expert_data['acs']
 
     # Initialize environment
-    env = DPEnv("../mujoco/motions/humanoid3d_walk.txt", "/DeepMimic_mujoco/src/mujoco/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
+    env = DPEnv("../mujoco_file/motions/humanoid3d_walk.txt", "../mujoco_file/humanoid_deepmimic/envs/asset/dp_env_v3.xml")
     env.reset_model()
     
     # Perform behavior cloning
-    ob_space = env.observation_space
-    ac_space = env.action_space
-    policy_net = build_policy_network(ob_space, ac_space)
+    ob_dim=56
+    ac_dim=28
+    policy_net = build_policy_network(ob_dim, ac_dim)
     policy_net = behavior_cloning(obs, actions, policy_net)  
 
     # Initialize video saver
-    width = 500
-    height = 500
-    vid_save = VideoSaver(width=width, height=height, fps = 30)
+    # width = 500
+    # height = 500
+    # vid_save = VideoSaver(width=width, height=height, fps = 30)
 
     # One evaluation loop
     policy_net.eval()
-    total = 0
-
-    MAX_STEPS = 200
-    
-    steps = 0
-    while True:
-        # Get observation from environment
-        obs = torch.tensor(env._get_obs().reshape((1,-1)),dtype=torch.float32)
-
-        # Use policy network to predict action
-        action = policy_net.act(obs)[0].detach().numpy()
-
-        # Step the environment with the predicted action
-        next_obs, reward, done, _ = env.step(action)
-
-        total += reward
-
-        # Save render
-        vid_save.addFrame(env.render(mode='rgb_array'))
-
-        # Check if episode is done
-        if done:
-            print("Total Reward:", total)
-            break
-        
-        steps +=1 
-        if steps >= MAX_STEPS:
-            print("Total Reward:", total)
-            break
-        ### STUDENT CODE START ###
-        # Add reward plotting
-        ### STUDENT CODE END ###
-
-    # Close video saver
-    vid_save.close()
+    viz_policy(env, policy_net)
 
 
 if __name__ == "__main__":
